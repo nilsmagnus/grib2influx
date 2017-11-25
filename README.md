@@ -19,3 +19,15 @@ From one single grib-file you will end up with one time-point for each series wi
 figure out forecast-time versus value-time description, "wide table" design
 
 
+# Walkthrough
+
+### fields from the grib-file 
+
+* TODO Forecasttime vs valuetime
+  * forecasttime: Section1.ReferenceTime + Section1.ReferenceTimeSignificance
+  * offset hour in filename for valuetime
+
+* What kind of data is this anyway? Section0.Discipline + Section4.ProductDefinitionTemplate.ParameterCategory
+  * use griblib.ReadProductDisciplineParameters to resolve the name
+
+* Calculating the coordinates of the data (Section3)
