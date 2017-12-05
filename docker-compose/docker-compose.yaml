@@ -1,0 +1,26 @@
+version: '3'
+services:
+
+  influx:
+    image: influxdb:alpine
+    ports:
+      - 8086:8086
+    environment:
+      - INFLUXDB_ADMIN_USER=admin
+      - INFLUXDB_ADMIN_PASSWORD=supersecret
+      - INFLUXDB_DB=forecasts
+    ## uncomment to store the data outside the container
+    #volumes:
+    #  - ./influxdata:/var/lib/influxdb
+
+
+  grafana:
+    image: grafana/grafana:master
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/grafana-datasource.yaml:/usr/share/grafana/conf/datasources/influxdb.yaml
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./grafana/dashboards/:/var/lib/grafana/dashboards/
+    depends_on:
+      - influx

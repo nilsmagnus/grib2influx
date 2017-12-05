@@ -11,6 +11,7 @@ import (
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/nilsmagnus/grib/griblib"
 	"strconv"
+	"sync"
 )
 
 type Coords struct {
@@ -18,26 +19,31 @@ type Coords struct {
 	Lon int
 }
 
-func main() {
-	gribFile := flag.String("gribfile", "", "gribfile to import")
-	flag.Parse()
+const (
+	defaultInfluxURL  = "http://localhost"
+	defaultInfluxPort = 8086
+	defaultDatabase   = "forecasts" // apixu data is actuals
+)
 
-	if *gribFile == "" {
+func main() {
+	gribFile, influxConfig := cliArguments()
+
+	if gribFile == "" {
 		fmt.Print("No gribfile specified!\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	file, ferr := os.Open(*gribFile)
+	file, ferr := os.Open(gribFile)
 
 	if ferr != nil {
 		panic(ferr)
 	}
 
-	forecastOffsetHour, forecastOffsetErr := forecastHourFromFileName(*gribFile)
+	forecastOffsetHour, forecastOffsetErr := forecastHourFromFileName(gribFile)
 
 	if forecastOffsetErr != nil {
-		panic(fmt.Sprintf("Could not parse forecast offset from filename, expected three trailing digits in filename, got %s", *gribFile))
+		panic(fmt.Sprintf("Could not parse forecast offset from filename, expected three trailing digits in filename, got %s", gribFile))
 	}
 
 	messages, err := griblib.ReadMessages(file, griblib.Options{})
@@ -48,18 +54,51 @@ func main() {
 
 	fmt.Printf("Read %d messages\n", len(messages))
 
-	fluxies := toInfluxPoints(messages, forecastOffsetHour)
+	wg  := sync.WaitGroup{}
+	wg.Add(len(messages))
 
-	storeInDatabase(fluxies)
+	for _, message := range messages {
+		go func() {
+			influxPoints := toInfluxPoints([]griblib.Message{message}, forecastOffsetHour)
+			saveErr := save(influxPoints, influxConfig)
+			if saveErr != nil {
+				fmt.Printf("Error saving points in message: %v\n", saveErr)
+			}
+			wg.Done()
+			fmt.Print(".")
+		}()
+	}
+	wg.Wait()
+	fmt.Print("\n")
 
 }
+
+func cliArguments() (string, ConnectionConfig) {
+	gribFile := flag.String("gribfile", "", "gribfile to import")
+
+	influxHost := flag.String("influxHost", defaultInfluxURL, "Hostname for influxdb")
+	influxUser := flag.String("influxUser", "", "User for influxdb")
+	influxDatabase := flag.String("database", defaultDatabase, "Database to use")
+	influxPassword := flag.String("influxPassword", "", "Password for influx")
+	influxPort := flag.Int("influxport", defaultInfluxPort, "Port for influxdb")
+
+	flag.Parse()
+
+	config := ConnectionConfig{
+		User:     *influxUser,
+		Password: *influxPassword,
+		Port:     *influxPort,
+		Hostname: *influxHost,
+		Database: *influxDatabase,
+	}
+	flag.Parse()
+
+	return *gribFile, config
+}
+
 func forecastHourFromFileName(fileName string) (int, error) {
 	v := fileName[len(fileName)-3:]
 	return strconv.Atoi(v)
-}
-
-func storeInDatabase(points []*client.Point) {
-	panic("not implemented")
 }
 
 func toInfluxPoints(messages []griblib.Message, forecastOffsetHour int) []*client.Point {
@@ -98,49 +137,27 @@ func toGoTime(gTime griblib.Time) time.Time {
 	return time.Date(int(gTime.Year), time.Month(gTime.Month), int(gTime.Day), int(gTime.Hour), int(gTime.Minute), int(gTime.Second), 0, time.Now().Location())
 }
 
-func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, coords Coords, offsetHour int) *client.Point {
+func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, coords Coords, offsetHours int) *client.Point {
 
 	fields := map[string]interface{}{
-		fmt.Sprintf("%dx%s", offsetHour, dataname): data,
+		fmt.Sprintf("%s", dataname): data,
 	}
 	// serieName is YYYY-mm-dd-hh.latxlon.dataname
-	serieName := fmt.Sprintf("%d-%d-%d-%d.%dx%d.%s",
+	serieName := fmt.Sprintf("%d-%d-%d-%02d.%dx%d.%s",
 		forecastTime.Year(), forecastTime.Month(), forecastTime.Day(), forecastTime.Hour(),
-		coords.Lat, coords.Lon,
+		coords.Lat/10000, coords.Lon/10000,
 		dataname)
 
 	tags := map[string]string{
 		"lat":          fmt.Sprintf("%d", coords.Lat),
 		"lon":          fmt.Sprintf("%d", coords.Lon),
-		"forecastdate": fmt.Sprintf("%d-%d-%d-%2d", forecastTime.Year(), forecastTime.Month(), forecastTime.Day(), forecastTime.Hour()),
-		"offsetHour":   fmt.Sprintf("%d", offsetHour),
+		"forecastdate": fmt.Sprintf("%d-%d-%d-%02d", forecastTime.Year(), forecastTime.Month(), forecastTime.Day(), forecastTime.Hour()),
+		"offsetHours":   fmt.Sprintf("%d", offsetHours),
 	}
-	point, err := client.NewPoint(serieName, tags, fields, forecastTime)
+	valueTime := forecastTime.Add(time.Duration(offsetHours) * time.Hour)
+	point, err := client.NewPoint(serieName, tags, fields, valueTime)
 	if err != nil {
 		panic(err)
 	}
 	return point
 }
-
-/*
-func asInfluxPoints(data ApixuForecast) []*client.Point {
-
-	points := []*client.Point{}
-	for _, day := range data.Forecast.Forecastday {
-		for _, hour := range day.Hour {
-			fields := map[string]interface{}{
-				"celsius":        hour.TempC,
-				"wind_kph":       hour.WindKph,
-				"wind_degree":    hour.WindDegree,
-				"percip_mm":      hour.PrecipMm,
-				"cloud":          hour.Cloud,
-				"humidity":       hour.Humidity,
-				"condition_code": hour.Condition.Code,
-			}
-			point, _ := client.NewPoint(SerieKey(data.Location), map[string]string{}, fields, time.Unix(int64(hour.TimeEpoch), 0))
-			points = append(points, point)
-		}
-	}
-	return points
-}
-*/
