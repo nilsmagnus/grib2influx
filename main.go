@@ -143,10 +143,9 @@ func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, 
 		fmt.Sprintf("%s", dataname): data,
 	}
 	// serieName is YYYY-mm-dd-hh.latxlon.dataname
-	serieName := fmt.Sprintf("%d-%d-%d-%02d.%dx%d.%s",
+	serieName := fmt.Sprintf("%d-%d-%d-%02d.%dx%d",
 		forecastTime.Year(), forecastTime.Month(), forecastTime.Day(), forecastTime.Hour(),
-		coords.Lat/10000, coords.Lon/10000,
-		dataname)
+		coords.Lat/10000, coords.Lon/10000)
 
 	tags := map[string]string{
 		"lat":          fmt.Sprintf("%d", coords.Lat),
