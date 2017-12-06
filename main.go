@@ -140,17 +140,17 @@ func toGoTime(gTime griblib.Time) time.Time {
 func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, coords Coords, offsetHours int) *client.Point {
 
 	fields := map[string]interface{}{
-		fmt.Sprintf("%s", dataname): data,
+		dataname: data,
 	}
 	// serieName is YYYY-mm-dd-hh.latxlon.dataname
-	serieName := fmt.Sprintf("%d-%d-%d-%02d.%dx%d",
+	serieName := fmt.Sprintf("%d-%02d-%02d-%02d-%dx%d",
 		forecastTime.Year(), forecastTime.Month(), forecastTime.Day(), forecastTime.Hour(),
 		coords.Lat/10000, coords.Lon/10000)
 
 	tags := map[string]string{
 		"lat":          fmt.Sprintf("%d", coords.Lat),
 		"lon":          fmt.Sprintf("%d", coords.Lon),
-		"forecastdate": fmt.Sprintf("%d-%d-%d-%02d", forecastTime.Year(), forecastTime.Month(), forecastTime.Day(), forecastTime.Hour()),
+		"forecastdate": fmt.Sprintf("%d-%02d-%02d-%02d", forecastTime.Year(), forecastTime.Month(), forecastTime.Day(), forecastTime.Hour()),
 		"offsetHours":   fmt.Sprintf("%d", offsetHours),
 	}
 	valueTime := forecastTime.Add(time.Duration(offsetHours) * time.Hour)
