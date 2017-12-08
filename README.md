@@ -2,7 +2,7 @@ Work in progress
 
 # grib2influx
 
-cli tool to parse forecasts (or other sections) from grib-files to influx as timeseries
+A cli tool to parse forecasts (or other sections) from grib-files and save to influx as timeseries.
 
 
 # Usage
