@@ -8,7 +8,6 @@ import (
 
 	"reflect"
 
-	"github.com/influxdata/influxdb/client/v2"
 	"github.com/nilsmagnus/grib/griblib"
 	"strconv"
 	"sync"
@@ -54,19 +53,17 @@ func main() {
 
 	fmt.Printf("Read %d messages\n", len(messages))
 
-	wg  := sync.WaitGroup{}
+	wg := sync.WaitGroup{}
 	wg.Add(len(messages))
 
 	for _, message := range messages {
-		go func() {
-			influxPoints := toInfluxPoints([]griblib.Message{message}, forecastOffsetHour)
-			saveErr := save(influxPoints, influxConfig)
-			if saveErr != nil {
-				fmt.Printf("Error saving points in message: %v\n", saveErr)
-			}
-			wg.Done()
-			fmt.Print(".")
-		}()
+		influxPoints := toInfluxPoints([]griblib.Message{message}, forecastOffsetHour)
+		saveErr := save(influxPoints, influxConfig)
+		if saveErr != nil {
+			fmt.Printf("Error saving points in message: %v\n", saveErr)
+		}
+		wg.Done()
+		fmt.Print(".")
 	}
 	wg.Wait()
 	fmt.Print("\n")
@@ -101,22 +98,6 @@ func forecastHourFromFileName(fileName string) (int, error) {
 	return strconv.Atoi(v)
 }
 
-func toInfluxPoints(messages []griblib.Message, forecastOffsetHour int) []*client.Point {
-	points := []*client.Point{}
-	for _, message := range messages {
-
-		forecastStartTime := toGoTime(message.Section1.ReferenceTime)
-
-		for counter, data := range message.Section7.Data {
-			coords := toCoords(counter, message.Section3)
-
-			dataTypeName := griblib.ReadProductDisciplineParameters(message.Section0.Discipline,
-				message.Section4.ProductDefinitionTemplate.ParameterCategory)
-			points = append(points, singleInfluxDataPoint(data, dataTypeName, forecastStartTime, coords, forecastOffsetHour))
-		}
-	}
-	return points
-}
 func toCoords(counter int, section3 griblib.Section3) Coords {
 	if grid, ok := section3.Definition.(*griblib.Grid0); ok {
 		lonCount := int((grid.Lo2 - grid.Lo1) / grid.Di)
@@ -135,28 +116,4 @@ func toCoords(counter int, section3 griblib.Section3) Coords {
 
 func toGoTime(gTime griblib.Time) time.Time {
 	return time.Date(int(gTime.Year), time.Month(gTime.Month), int(gTime.Day), int(gTime.Hour), int(gTime.Minute), int(gTime.Second), 0, time.Now().Location())
-}
-
-func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, coords Coords, offsetHours int) *client.Point {
-
-	fields := map[string]interface{}{
-		dataname: data,
-	}
-	// serieName is YYYY-mm-dd-hh.latxlon.dataname
-	serieName := fmt.Sprintf("%d-%02d-%02d-%02d-%dx%d",
-		forecastTime.Year(), forecastTime.Month(), forecastTime.Day(), forecastTime.Hour(),
-		coords.Lat/10000, coords.Lon/10000)
-
-	tags := map[string]string{
-		"lat":          fmt.Sprintf("%d", coords.Lat),
-		"lon":          fmt.Sprintf("%d", coords.Lon),
-		"forecastdate": fmt.Sprintf("%d-%02d-%02d-%02d", forecastTime.Year(), forecastTime.Month(), forecastTime.Day(), forecastTime.Hour()),
-		"offsetHours":   fmt.Sprintf("%d", offsetHours),
-	}
-	valueTime := forecastTime.Add(time.Duration(offsetHours) * time.Hour)
-	point, err := client.NewPoint(serieName, tags, fields, valueTime)
-	if err != nil {
-		panic(err)
-	}
-	return point
 }
