@@ -8,9 +8,10 @@ import (
 
 	"reflect"
 
-	"github.com/nilsmagnus/grib/griblib"
 	"strconv"
 	"sync"
+
+	"github.com/nilsmagnus/grib/griblib"
 )
 
 type Coords struct {
@@ -21,16 +22,15 @@ type Coords struct {
 const (
 	defaultInfluxURL  = "http://localhost"
 	defaultInfluxPort = 8086
-	defaultDatabase   = "forecasts" // apixu data is actuals
+	defaultDatabase   = "forecasts"
 )
 
 func main() {
-	gribFile, influxConfig := cliArguments()
+	portNo, gribFile, influxConfig := cliArguments()
 
 	if gribFile == "" {
-		fmt.Print("No gribfile specified!\n\n")
-		flag.Usage()
-		os.Exit(1)
+		fmt.Print("No gribfile specified, starting server mode")
+		startServerMode(portNo, influxConfig)
 	}
 
 	file, ferr := os.Open(gribFile)
@@ -56,9 +56,16 @@ func main() {
 	wg := sync.WaitGroup{}
 	wg.Add(len(messages))
 
+	client, err := clientFromConfig(influxConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	defer client.Close()
+
 	for _, message := range messages {
 		influxPoints := toInfluxPoints([]griblib.Message{message}, forecastOffsetHour)
-		saveErr := save(influxPoints, influxConfig)
+		saveErr := save(influxPoints, client, influxConfig.Database)
 		if saveErr != nil {
 			fmt.Printf("Error saving points in message: %v\n", saveErr)
 		}
@@ -70,14 +77,15 @@ func main() {
 
 }
 
-func cliArguments() (string, ConnectionConfig) {
-	gribFile := flag.String("gribfile", "", "gribfile to import")
+func cliArguments() (int, string, ConnectionConfig) {
+	gribFile := flag.String("gribfile", "", "Gribfile to import. If no gribfile specified, start server mode.")
 
-	influxHost := flag.String("influxHost", defaultInfluxURL, "Hostname for influxdb")
-	influxUser := flag.String("influxUser", "", "User for influxdb")
-	influxDatabase := flag.String("database", defaultDatabase, "Database to use")
-	influxPassword := flag.String("influxPassword", "", "Password for influx")
-	influxPort := flag.Int("influxport", defaultInfluxPort, "Port for influxdb")
+	portNo := flag.Int("port", 8080, "Server port no, if servermode.")
+	influxHost := flag.String("influxHost", defaultInfluxURL, "Hostname for influxdb.")
+	influxUser := flag.String("influxUser", "", "User for influxdb.")
+	influxDatabase := flag.String("database", defaultDatabase, "Database name to use.")
+	influxPassword := flag.String("influxPassword", "", "Password for influx.")
+	influxPort := flag.Int("influxport", defaultInfluxPort, "Port for influxdb.")
 
 	flag.Parse()
 
@@ -90,7 +98,7 @@ func cliArguments() (string, ConnectionConfig) {
 	}
 	flag.Parse()
 
-	return *gribFile, config
+	return *portNo, *gribFile, config
 }
 
 func forecastHourFromFileName(fileName string) (int, error) {

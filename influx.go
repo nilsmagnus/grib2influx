@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/nilsmagnus/grib/griblib"
-	"time"
 )
 
 //ConnectionConfig is connection config w/credentials and url
@@ -25,15 +26,10 @@ func clientFromConfig(config ConnectionConfig) (client.Client, error) {
 	})
 }
 
-func save(points []*client.Point, config ConnectionConfig) error {
-	c, err := clientFromConfig(config)
-
-	if err != nil {
-		return fmt.Errorf("Error creating client %s", err.Error())
-	}
+func save(points []*client.Point, influxClient client.Client, database string) error {
 
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  config.Database,
+		Database:  database,
 		Precision: "s",
 	})
 
@@ -43,7 +39,7 @@ func save(points []*client.Point, config ConnectionConfig) error {
 
 	bp.AddPoints(points)
 
-	return c.Write(bp)
+	return influxClient.Write(bp)
 }
 
 func toInfluxPoints(messages []griblib.Message, forecastOffsetHour int) []*client.Point {
@@ -64,7 +60,6 @@ func toInfluxPoints(messages []griblib.Message, forecastOffsetHour int) []*clien
 	return points
 }
 
-
 func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, coords Coords, offsetHours int) *client.Point {
 
 	fields := map[string]interface{}{
@@ -81,4 +76,3 @@ func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, 
 	}
 	return point
 }
-
