@@ -46,18 +46,39 @@ func toInfluxPoints(messages []griblib.Message, forecastOffsetHour int) []*clien
 	points := []*client.Point{}
 	for _, message := range messages {
 
-		forecastStartTime := toGoTime(message.Section1.ReferenceTime)
-
+		if ! isRelevantDisciplineCatetory(message){
+			continue
+		}
 		dataTypeName := griblib.ReadProductDisciplineParameters(message.Section0.Discipline,
 			message.Section4.ProductDefinitionTemplate.ParameterCategory)
+
+		forecastStartTime := toGoTime(message.Section1.ReferenceTime)
 
 		for counter, data := range message.Section7.Data {
 			coords := toCoords(counter, message.Section3)
 
 			points = append(points, singleInfluxDataPoint(data, dataTypeName, forecastStartTime, coords, forecastOffsetHour))
+			if forecastOffsetHour ==0 {
+				points = append(points, singleInfluxDataPointActuals(data, dataTypeName, forecastStartTime, coords))
+			}
 		}
 	}
 	return points
+}
+
+func isRelevantDisciplineCatetory(message griblib.Message) bool {
+	switch message.Section0.Discipline{
+	case 0: // normal earth-weather
+		switch message.Section4.ProductDefinitionTemplate.ParameterCategory {
+		case 0: // temperature
+			return true
+		case 1: // moist
+			return true
+		case 6: // cloud
+			return true
+		}
+	}
+	return false
 }
 
 func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, coords Coords, offsetHours int) *client.Point {
@@ -71,6 +92,22 @@ func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, 
 
 	valueTime := forecastTime.Add(time.Duration(offsetHours) * time.Hour)
 	point, err := client.NewPoint(serieName, map[string]string{}, fields, valueTime)
+	if err != nil {
+		panic(err)
+	}
+	return point
+}
+
+// if offsethour ==0, store to "actuals"
+func singleInfluxDataPointActuals(data int64, dataname string, forecastTime time.Time, coords Coords) *client.Point {
+
+	fields := map[string]interface{}{
+		fmt.Sprintf("%s-%06dx%06d", dataname, coords.Lat/10000, coords.Lon/10000): data,
+	}
+
+	serieName := dataname
+
+	point, err := client.NewPoint(serieName, map[string]string{}, fields, forecastTime)
 	if err != nil {
 		panic(err)
 	}

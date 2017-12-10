@@ -15,7 +15,7 @@ func Test_tofluxpoints(t *testing.T) {
 		t.Fatalf("Error opening testfile %v", fileErr)
 	}
 
-	messages, gribErr := griblib.ReadMessages(testFile, griblib.Options{MaximumNumberOfMessages: 1})
+	messages, gribErr := griblib.ReadMessages(testFile, griblib.Options{MaximumNumberOfMessages: 6})
 
 	if gribErr != nil {
 		t.Fatalf("Could not parse testfile, %v", gribErr)
