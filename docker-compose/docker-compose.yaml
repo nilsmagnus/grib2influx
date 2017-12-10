@@ -1,7 +1,7 @@
 version: '3'
 services:
 
-  influx1:
+  influx:
     image: influxdb:alpine
     ports:
       - 8086:8086
@@ -18,10 +18,10 @@ services:
     ports:
       - 8080:8080
     depends_on:
-      - influx1
+      - influx
 
 
-  grafana1:
+  grafana:
     image: grafana/grafana:master
     ports:
       - "3000:3000"
@@ -29,5 +29,5 @@ services:
       - ./grafana/grafana-datasource.yaml:/usr/share/grafana/conf/datasources/influxdb.yaml
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini
     depends_on:
-      - influx1
+      - influx
       

@@ -1,4 +1,4 @@
-FROM golang
+FROM alpine
 
 ADD grib2influx grib2influx
 
