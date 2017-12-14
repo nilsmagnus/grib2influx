@@ -46,9 +46,6 @@ func toInfluxPoints(messages []griblib.Message, forecastOffsetHour int) []*clien
 	points := []*client.Point{}
 	for _, message := range messages {
 
-		if ! isRelevantDisciplineCatetory(message) {
-			continue
-		}
 		dataTypeName := griblib.ReadProductDisciplineParameters(message.Section0.Discipline,
 			message.Section4.ProductDefinitionTemplate.ParameterCategory)
 
@@ -56,35 +53,15 @@ func toInfluxPoints(messages []griblib.Message, forecastOffsetHour int) []*clien
 
 		for counter, data := range message.Section7.Data {
 			coords := toCoords(counter, message.Section3)
-
-			if ! isRelevantCoordinates(coords) {
-				continue
-			}
+			// append forecasts and actuals to all series
 			points = append(points, singleInfluxDataPoint(data, dataTypeName, forecastStartTime, coords, forecastOffsetHour))
+			// append actuals to a separate series
 			if forecastOffsetHour == 0 {
 				points = append(points, singleInfluxDataPointActuals(data, dataTypeName, forecastStartTime, coords))
 			}
 		}
 	}
 	return points
-}
-func isRelevantCoordinates(coords Coords) bool {
-	return true
-}
-
-func isRelevantDisciplineCatetory(message griblib.Message) bool {
-	switch message.Section0.Discipline {
-	case 0: // normal earth-weather
-		switch message.Section4.ProductDefinitionTemplate.ParameterCategory {
-		case 0: // temperature
-			return true
-		case 1: // moist
-			return true
-		case 6: // cloud
-			return true
-		}
-	}
-	return false
 }
 
 func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, coords Coords, offsetHours int) *client.Point {

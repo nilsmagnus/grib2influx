@@ -15,12 +15,12 @@ func Test_tofluxpoints(t *testing.T) {
 		t.Fatalf("Error opening testfile %v", fileErr)
 	}
 
-	messages, gribErr := griblib.ReadMessages(testFile, griblib.Options{MaximumNumberOfMessages: 6})
+	messages, gribErr := griblib.ReadMessages(testFile)
 
 	if gribErr != nil {
 		t.Fatalf("Could not parse testfile, %v", gribErr)
 	}
-	fluxies := toInfluxPoints(messages, 3)
+	fluxies := toInfluxPoints([]griblib.Message{messages[0]}, 3)
 
 	if len(fluxies) == 0 || len(fluxies) != int(messages[0].Section3.DataPointCount) {
 		t.Errorf("Expected fluxies length to be the same as message.datapointCount, expected %d, was %d",

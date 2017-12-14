@@ -9,7 +9,6 @@ import (
 	"reflect"
 
 	"strconv"
-	"sync"
 
 	"github.com/nilsmagnus/grib/griblib"
 )
@@ -45,16 +44,33 @@ func main() {
 		panic(fmt.Sprintf("Could not parse forecast offset from filename, expected three trailing digits in filename, got %s", gribFile))
 	}
 
-	messages, err := griblib.ReadMessages(file, griblib.Options{})
+	messages, err := griblib.ReadMessages(file)
 
 	if err != nil {
 		fmt.Printf("Error reading gribfile: %v", err)
+		panic(err)
 	}
 
 	fmt.Printf("Read %d messages\n", len(messages))
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(messages))
+	// filter the messages based on what criterias you might have. See griblib github page for examples
+	filtered := griblib.Filter(messages, griblib.Options{
+		Discipline: 0, //
+		Category:   0, // temperature
+		// norway+ sweden (ish)
+		GeoFilter: griblib.GeoFilter{
+			MinLat:  57000000,
+			MaxLat:  71000000,
+			MinLong: 4400000,
+			MaxLong: 32000000,
+		},
+		Surface: griblib.Surface{
+			Type:  100, // isobaric surface
+			Value: 100,
+		},
+	})
+
+	fmt.Printf("%d messages after filtering \n", len(filtered))
 
 	client, err := clientFromConfig(influxConfig)
 	if err != nil {
@@ -63,21 +79,19 @@ func main() {
 
 	defer client.Close()
 
-	for _, message := range messages {
+	for _, message := range filtered {
 		influxPoints := toInfluxPoints([]griblib.Message{message}, forecastOffsetHour)
 		saveErr := save(influxPoints, client, influxConfig.Database)
 		if saveErr != nil {
 			fmt.Printf("Error saving points in message: %v\n", saveErr)
 		}
-		wg.Done()
 		fmt.Print(".")
 	}
-	wg.Wait()
 	fmt.Print("\n")
 
 }
 
-func cliArguments() (int, string, ConnectionConfig) {
+func cliArguments() (portno int, gribfileName string, influxConfig ConnectionConfig) {
 	gribFile := flag.String("gribfile", "", "Gribfile to import. If no gribfile specified, start server mode.")
 
 	portNo := flag.Int("port", 8080, "Server port no, if servermode.")
@@ -89,7 +103,7 @@ func cliArguments() (int, string, ConnectionConfig) {
 
 	flag.Parse()
 
-	config := ConnectionConfig{
+	influxConfig = ConnectionConfig{
 		User:     *influxUser,
 		Password: *influxPassword,
 		Port:     *influxPort,
@@ -98,7 +112,7 @@ func cliArguments() (int, string, ConnectionConfig) {
 	}
 	flag.Parse()
 
-	return *portNo, *gribFile, config
+	return *portNo, *gribFile, influxConfig
 }
 
 func forecastHourFromFileName(fileName string) (int, error) {
