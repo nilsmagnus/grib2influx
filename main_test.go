@@ -15,6 +15,8 @@ func Test_tocoord(t *testing.T) {
 		Lo1: 0,
 		Lo2: 357500000,
 		La1: la1,
+		Nj:  144,
+		Ni:  73,
 	}}
 	coordse := toCoords(45, section3)
 
@@ -22,16 +24,16 @@ func Test_tocoord(t *testing.T) {
 		t.Errorf("Expected lon %d, got %d", 45*di, coordse.Lon)
 	}
 
-	count2 := 357500000*3/di + 45
+	count2 := 144*3 + 45
 
 	coords2 := toCoords(count2, section3)
 
 	if coords2.Lon != (45 * di) {
-		t.Errorf("Expected lon2 %d, got %d", count2*di, coordse.Lon)
+		t.Errorf("Expected lon2 %d, got %d, index %v", 45*di, coords2.Lon, coords2.Lon/di)
 	}
 
-	if coords2.Lat != la1-(3*di) {
-		t.Errorf("Expected lat2 %d, got %d", 3*di, coordse.Lat)
+	if coords2.Lat != la1+(3*di) {
+		t.Errorf("Expected lat2 %d, got %d", la1+3*di, coords2.Lat)
 	}
 
 }

@@ -70,7 +70,7 @@ func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, 
 		fmt.Sprintf("%s-%06dx%06d", dataname, coords.Lat/10000, coords.Lon/10000): data,
 	}
 
-	serieName := fmt.Sprintf("%d-%02d-%02d-%02d",
+	serieName := fmt.Sprintf("D%d%02d%02d%02d",
 		forecastTime.Year(), forecastTime.Month(), forecastTime.Day(), forecastTime.Hour())
 
 	valueTime := forecastTime.Add(time.Duration(offsetHours) * time.Hour)

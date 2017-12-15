@@ -122,10 +122,10 @@ func forecastHourFromFileName(fileName string) (int, error) {
 
 func toCoords(counter int, section3 griblib.Section3) Coords {
 	if grid, ok := section3.Definition.(*griblib.Grid0); ok {
-		lonCount := int((grid.Lo2 - grid.Lo1) / grid.Di)
+		lonCount := int(grid.Nj)
 
-		lat := int(grid.La1) - (counter/lonCount)*int(grid.Di)
-		lon := (counter % lonCount) * int(grid.Dj)
+		lat := int(grid.La1) + (counter/lonCount)*int(grid.Di)
+		lon := int(grid.Lo1) + (counter%lonCount)*int(grid.Dj)
 		return Coords{
 			Lat: lat,
 			Lon: lon,
