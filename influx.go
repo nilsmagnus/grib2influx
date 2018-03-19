@@ -64,7 +64,7 @@ func toInfluxPoints(messages []griblib.Message, forecastOffsetHour int) []*clien
 	return points
 }
 
-func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, coords Coords, offsetHours int) *client.Point {
+func singleInfluxDataPoint(data float64, dataname string, forecastTime time.Time, coords Coords, offsetHours int) *client.Point {
 
 	fields := map[string]interface{}{
 		fmt.Sprintf("%s-%06dx%06d", dataname, coords.Lat/10000, coords.Lon/10000): data,
@@ -82,7 +82,7 @@ func singleInfluxDataPoint(data int64, dataname string, forecastTime time.Time, 
 }
 
 // if offsethour ==0, store to "actuals"
-func singleInfluxDataPointActuals(data int64, dataname string, forecastTime time.Time, coords Coords) *client.Point {
+func singleInfluxDataPointActuals(data float64, dataname string, forecastTime time.Time, coords Coords) *client.Point {
 
 	fields := map[string]interface{}{
 		fmt.Sprintf("%s-%06dx%06d", dataname, coords.Lat/10000, coords.Lon/10000): data,
