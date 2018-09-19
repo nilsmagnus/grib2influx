@@ -1,0 +1,8 @@
+
+*.iml
+testdata/
+.idea/
+*.ipr
+*.iws
+grib
+
