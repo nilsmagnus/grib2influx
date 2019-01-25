@@ -1,4 +1,6 @@
-Work in progress
+Sample application of how to read grib2 files and insert the data to influx.
+
+Use at your own risk. I suggest you use this project for inspiration, not as a finished product. 
 
 # grib2influx
 
